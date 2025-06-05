@@ -7,7 +7,7 @@ let originalVisitorData = null;
 let isPersonNameValid = false;
 
 // Define API base URL
-const API_BASE_URL = 'https://192.168.3.75:3001';
+const API_BASE_URL = 'https://192.168.3.73:3001';
 
 // Helper function to handle API requests
 async function apiRequest(endpoint, method = 'GET', body = null) {
@@ -78,7 +78,7 @@ async function fetchPersonNameSuggestions(query, isValidationCheck = false) {
 
     try {
         const response = await fetch(
-            `https://192.168.3.75:3001/users/search?query=${encodeURIComponent(query)}`,
+            `https://192.168.3.73:3001/users/search?query=${encodeURIComponent(query)}`,
             {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
@@ -373,7 +373,7 @@ async function fetchVisitorData(page = 1, limit = 10, retries = 3) {
     console.log(`📡 Fetching visitor data: page=${page}, limit=${limit}`);
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            const url = `https://192.168.3.75:3001/appointment?page=${page}&limit=${limit}`;
+            const url = `https://192.168.3.73:3001/appointment?page=${page}&limit=${limit}`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
@@ -551,7 +551,7 @@ async function loadVisitorData() {
 async function fetchVisitorById(visitorId, retries = 3) {
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            const response = await fetch(`https://192.168.3.75:3001/appointment/${visitorId}`, {
+            const response = await fetch(`https://192.168.3.73:3001/appointment/${visitorId}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -660,7 +660,7 @@ async function openVisitorModal(visitorId) {
 
         if (path && path.trim() !== '') {
             try {
-                const photoUrl = `https://192.168.3.75:3001/appointment/${visitorId}/photo?type=${type}`;
+                const photoUrl = `https://192.168.3.73:3001/appointment/${visitorId}/photo?type=${type}`;
                 const response = await fetch(photoUrl, { method: 'GET', mode: 'cors' });
                 if (!response.ok) throw new Error('Photo fetch failed');
                 const blob = await response.blob();
@@ -787,7 +787,7 @@ document.getElementById('visitorForm').addEventListener('submit', async (e) => {
                 Saving...
             `;
             try {
-                const response = await fetch(`https://192.168.3.75:3001/appointment/${visitorId}`, {
+                const response = await fetch(`https://192.168.3.73:3001/appointment/${visitorId}`, {
                     method: 'PUT',
                     body,
                 });
@@ -863,7 +863,7 @@ async function saveVisitorNote(visitorId, note, maxAttempts = 3) {
 
     async function attemptUpdate(attempt = 1) {
         try {
-            const response = await fetch(`https://192.168.3.75:3001/appointment/${visitorId}`, {
+            const response = await fetch(`https://192.168.3.73:3001/appointment/${visitorId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ notes: note }),
@@ -936,7 +936,7 @@ async function updateVisitorStatus(visitorId, status, resetStatus = {}, maxAttem
 
     async function attemptUpdate(attempt = 1) {
         try {
-            const response = await fetch(`https://192.168.3.75:3001/appointment/${visitorId}/status/${status}`, {
+            const response = await fetch(`https://192.168.3.73:3001/appointment/${visitorId}/status/${status}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sendEmail: false, ...resetStatus }),
