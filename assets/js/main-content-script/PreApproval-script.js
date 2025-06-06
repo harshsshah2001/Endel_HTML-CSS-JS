@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('appointmentForm');
     const submitBtn = document.getElementById('submitBtn');
@@ -130,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             populateDropdown('gender', genders);
 
-
             const genderSelect = document.getElementById('gender');
         } catch (error) {
             console.error('Error fetching purpose of genders:', error);
@@ -141,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchGender();
 
     function populateForm(appointment) {
-        const fields = ['firstname', 'lastname', 'gender', 'contactnumber', 'email',];
+        const fields = ['firstname', 'lastname', 'gender', 'contactnumber', 'email'];
         fields.forEach(field => {
             const element = document.getElementById(field);
             if (element && appointment[field]) {
@@ -159,18 +157,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch(`https://192.168.3.73:3001/appointment/contactnumber/${encodeURIComponent(contactnumber)}`, {
+            const response = await fetch(`https://192.168.3.73:3001/master-records/by-contactnumber/${encodeURIComponent(contactnumber)}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
 
             if (response.ok) {
-                const appointment = await response.json();
-                console.log('Appointment data fetched for contactnumber:', appointment);
-                populateForm(appointment);
-                showMessage('Appointment data loaded', 'success');
+                const masterRecord = await response.json();
+                if (masterRecord) {
+                    console.log('Master record data fetched for contactnumber:', masterRecord);
+                    populateForm(masterRecord);
+                    showMessage('Master record data loaded', 'success');
+                } else {
+                    console.log('No master record found for contactnumber:', contactnumber);
+                    document.getElementById('contactnumber').value = contactnumber;
+                }
             } else if (response.status === 404) {
-                console.log('No appointment found for contactnumber:', contactnumber);
+                console.log('No master record found for contactnumber:', contactnumber);
                 document.getElementById('contactnumber').value = contactnumber;
             } else {
                 throw new Error(`HTTP ${response.status}`);
