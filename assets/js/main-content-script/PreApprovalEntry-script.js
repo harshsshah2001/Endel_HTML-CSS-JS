@@ -605,6 +605,7 @@ async function openVisitorModal(visitorId) {
     const visitor = await fetchVisitorById(visitorId);
     if (!visitor) return;
 
+    console.log('Visitor data on modal open:', visitor); // Debug log
     originalVisitorData = { ...visitor };
 
     const populateField = (id, value, defaultValue = '') => {
@@ -899,33 +900,64 @@ function setButtonVisibility(visitorId, visitor) {
     buttons.forEach(btnId => {
         const btn = document.getElementById(btnId);
         if (btn) {
-            // Initially hide all buttons except noteBtn and save-details (until exit)
+            // Initially hide all buttons except noteBtn and save-details
             btn.style.display = (btnId === 'noteBtn' || btnId === 'save-details') ? 'inline-block' : 'none';
         }
     });
+
+    // Log visitor state for debugging
+    console.log('Visitor state in setButtonVisibility:', {
+        isApproved: visitor.isApproved,
+        complete: visitor.complete,
+        exit: visitor.exit,
+        disapprovedFlag: sessionStorage.getItem(`visitor_${visitorId}_disapproved`)
+    });
+
+    // Define the initial state: no action has been taken
+    const isInitialState = !visitor.isApproved && !visitor.complete && !visitor.exit && !sessionStorage.getItem(`visitor_${visitorId}_disapproved`);
 
     if (visitor.exit) {
         // Only Note button visible after exit
         const saveDetailsBtn = document.getElementById('save-details');
         if (saveDetailsBtn) saveDetailsBtn.style.display = 'none';
-    } else if (visitor.complete || visitor.disapproved) {
+    } else if (visitor.complete) {
+        // When complete, show Exit, Save Details, and Note buttons
         const exitBtn = document.getElementById('exitBtn');
         if (exitBtn) exitBtn.style.display = 'inline-block';
-        // Save Details remains visible
     } else if (visitor.isApproved) {
+        // When approved (isApproved: true), show Complete, Save Details, and Note buttons
         const completeBtn = document.getElementById('completeBtn');
         if (completeBtn) completeBtn.style.display = 'inline-block';
-        // Save Details remains visible
-    } else {
+    } else if (sessionStorage.getItem(`visitor_${visitorId}_disapproved`) === 'true') {
+        // Disapproved state: show Save Details, Exit, and Note buttons
+        const exitBtn = document.getElementById('exitBtn');
+        if (exitBtn) exitBtn.style.display = 'inline-block';
+        // Explicitly hide Approve, Disapprove, and Complete buttons
+        const approveBtn = document.getElementById('approveBtn');
+        const disapproveBtn = document.getElementById('disapproveBtn');
+        const completeBtn = document.getElementById('completeBtn');
+        if (approveBtn) approveBtn.style.display = 'none';
+        if (disapproveBtn) disapproveBtn.style.display = 'none';
+        if (completeBtn) completeBtn.style.display = 'none';
+    } else if (isInitialState) {
+        // Initial state: show Approve, Disapprove, Save Details, and Note buttons
         const approveBtn = document.getElementById('approveBtn');
         const disapproveBtn = document.getElementById('disapproveBtn');
         if (approveBtn) approveBtn.style.display = 'inline-block';
         if (disapproveBtn) disapproveBtn.style.display = 'inline-block';
-        // Save Details remains visible
     }
 
-    const state = visitor.exit ? 'none' : (visitor.complete || visitor.disapproved) ? 'exit' : visitor.isApproved ? 'complete' : 'approve';
+    const state = visitor.exit
+        ? 'none'
+        : visitor.complete
+        ? 'exit'
+        : visitor.isApproved
+        ? 'complete'
+        : sessionStorage.getItem(`visitor_${visitorId}_disapproved`) === 'true'
+        ? 'disapproved'
+        : 'approve'; // Default to initial state
     sessionStorage.setItem(`buttonState_${visitorId}`, state);
+    console.log(`Button state set to: ${state}`);
 }
 
 async function updateVisitorStatus(visitorId, status, resetStatus = {}, maxAttempts = 3) {
@@ -934,12 +966,22 @@ async function updateVisitorStatus(visitorId, status, resetStatus = {}, maxAttem
         return false;
     }
 
+    // Ensure isApproved and complete are set appropriately based on status
+    const payload = {
+        sendEmail: false,
+        ...resetStatus,
+        ...(status === 'approve' ? { isApproved: true, complete: false } : {}),
+        ...(status === 'disapprove' ? { isApproved: false, complete: false } : {}),
+        ...(status === 'complete' ? { complete: true } : {}),
+        ...(status === 'exit' ? { exit: true } : {}),
+    };
+
     async function attemptUpdate(attempt = 1) {
         try {
             const response = await fetch(`https://192.168.3.73:3001/appointment/${visitorId}/status/${status}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sendEmail: false, ...resetStatus }),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
@@ -948,11 +990,10 @@ async function updateVisitorStatus(visitorId, status, resetStatus = {}, maxAttem
             }
 
             const updatedVisitor = await response.json();
-            console.log(`Visitor status updated to ${status}: | isApproved: ${updatedVisitor.isApproved} | complete: ${updatedVisitor.complete} | exit: ${updatedVisitor.exit} | disapproved: ${updatedVisitor.disapproved || false}`, updatedVisitor);
+            console.log(`Visitor status updated to ${status}: | isApproved: ${updatedVisitor.isApproved} | complete: ${updatedVisitor.complete} | exit: ${updatedVisitor.exit}`, updatedVisitor);
 
             setButtonVisibility(visitorId, updatedVisitor);
 
-            // showMessage(`Visitor status updated to ${status}`, 'success');
             originalVisitorData = null;
             await loadVisitorData();
             return updatedVisitor;
@@ -973,96 +1014,100 @@ async function updateVisitorStatus(visitorId, status, resetStatus = {}, maxAttem
 
 // Append event listeners to DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('approveBtn')?.addEventListener('click', async () => {
-            const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
-            if (await updateVisitorStatus(visitorId, 'approve')) {
-                const visitor = await fetchVisitorById(visitorId);
-                if (visitor) {
-                    setButtonVisibility(visitorId, visitor);
-                    // Set success message before redirect
-                    sessionStorage.setItem('successMessage', 'Visitor status approved successfully');
-                    window.location.href = 'PreApprovalEntry.html';
-                }
-            }
-        });
-
-        const message = sessionStorage.getItem('successMessage');
-        if (message) {
-            showMessage(message, 'success');
-            sessionStorage.removeItem('successMessage'); // Clear after showing
-        }
-
-        document.getElementById('disapproveBtn')?.addEventListener('click', async () => {
-            const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
-            let visitor = await updateVisitorStatus(visitorId, 'disapprove');
+    document.getElementById('approveBtn')?.addEventListener('click', async () => {
+        const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
+        // Remove disapproval flag when approving
+        sessionStorage.removeItem(`visitor_${visitorId}_disapproved`);
+        if (await updateVisitorStatus(visitorId, 'approve')) {
+            const visitor = await fetchVisitorById(visitorId);
             if (visitor) {
-                visitor = await updateVisitorStatus(visitorId, 'complete');
-                if (visitor) {
-                    setButtonVisibility(visitorId, visitor);
-                    // Set success message before redirect
-                    sessionStorage.setItem('successMessage', 'Visitor status disapproved successfully');
-                    window.location.href = 'PreApprovalEntry.html';
-                }
+                setButtonVisibility(visitorId, visitor);
+                // Set success message before redirect
+                sessionStorage.setItem('successMessage', 'Visitor status approved successfully');
+                window.location.href = 'PreApprovalEntry.html';
             }
-        });
-
-        const message1 = sessionStorage.getItem('successMessage');
-        if (message1) {
-            showMessage(message1, 'success');
-            sessionStorage.removeItem('successMessage'); // clear after showing
         }
+    });
 
+    const message = sessionStorage.getItem('successMessage');
+    if (message) {
+        showMessage(message, 'success');
+        sessionStorage.removeItem('successMessage'); // Clear after showing
+    }
 
-        document.getElementById('completeBtn')?.addEventListener('click', async () => {
-            const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
-            if (await updateVisitorStatus(visitorId, 'complete')) {
-                const visitor = await fetchVisitorById(visitorId);
-                if (visitor) {
-                    setButtonVisibility(visitorId, visitor);
-                    // Set success message before redirect
-                    sessionStorage.setItem('successMessage', 'Visitor status marked as complete successfully');
-                    window.location.href = 'PreApprovalEntry.html';
-                }
-            }
-        });
-
-        const message2 = sessionStorage.getItem('successMessage');
-        if (message2) {
-            showMessage(message2, 'success');
-            sessionStorage.removeItem('successMessage');
+    document.getElementById('disapproveBtn')?.addEventListener('click', async () => {
+        const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
+        let visitor = await updateVisitorStatus(visitorId, 'disapprove', { complete: false });
+        if (visitor) {
+            // Set a flag in sessionStorage to indicate this visitor has been disapproved
+            sessionStorage.setItem(`visitor_${visitorId}_disapproved`, 'true');
+            setButtonVisibility(visitorId, visitor);
+            // Close the modal after disapproving
+            document.getElementById('visitorModal').style.display = 'none';
+            originalVisitorData = null;
+            await loadVisitorData();
+            showMessage('Visitor status disapproved successfully', 'success');
         }
+    });
 
-        document.getElementById('exitBtn')?.addEventListener('click', async () => {
-            const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
-            if (await updateVisitorStatus(visitorId, 'exit')) {
-                const visitor = await fetchVisitorById(visitorId);
-                if (visitor) {
-                    setButtonVisibility(visitorId, visitor);
-                    // Set success message before redirect
-                    sessionStorage.setItem('successMessage', 'Visitor has exited successfully');
-                    window.location.href = 'PreApprovalEntry.html';
-                }
+    const message1 = sessionStorage.getItem('successMessage');
+    if (message1) {
+        showMessage(message1, 'success');
+        sessionStorage.removeItem('successMessage'); // Clear after showing
+    }
+
+    document.getElementById('completeBtn')?.addEventListener('click', async () => {
+        const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
+        // Remove disapproval flag when completing
+        sessionStorage.removeItem(`visitor_${visitorId}_disapproved`);
+        if (await updateVisitorStatus(visitorId, 'complete')) {
+            const visitor = await fetchVisitorById(visitorId);
+            if (visitor) {
+                setButtonVisibility(visitorId, visitor);
+                // Set success message before redirect
+                sessionStorage.setItem('successMessage', 'Visitor status marked as complete successfully');
+                window.location.href = 'PreApprovalEntry.html';
             }
-        });
-
-        const message3 = sessionStorage.getItem('successMessage');
-        if (message3) {
-            showMessage(message3, 'success');
-            sessionStorage.removeItem('successMessage'); // Clear after showing
         }
+    });
 
-        document.getElementById('noteBtn')?.addEventListener('click', async () => {
-            const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
-            const noteInput = document.getElementById('edit-notes');
-            if (!noteInput) {
-                showMessage('Note input field not found', 'error');
-                return;
+    const message2 = sessionStorage.getItem('successMessage');
+    if (message2) {
+        showMessage(message2, 'success');
+        sessionStorage.removeItem('successMessage');
+    }
+
+    document.getElementById('exitBtn')?.addEventListener('click', async () => {
+        const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
+        if (await updateVisitorStatus(visitorId, 'exit')) {
+            const visitor = await fetchVisitorById(visitorId);
+            if (visitor) {
+                setButtonVisibility(visitorId, visitor);
+                // Set success message before redirect
+                sessionStorage.setItem('successMessage', 'Visitor has exited successfully');
+                window.location.href = 'PreApprovalEntry.html';
             }
-            const note = noteInput.value.trim();
-            if (!note) {
-                showMessage('Please enter a note', 'error');
-                return;
-            }
-            await saveVisitorNote(visitorId, note);
-        });
+        }
+    });
+
+    const message3 = sessionStorage.getItem('successMessage');
+    if (message3) {
+        showMessage(message3, 'success');
+        sessionStorage.removeItem('successMessage'); // Clear after showing
+    }
+
+    document.getElementById('noteBtn')?.addEventListener('click', async () => {
+        const visitorId = document.getElementById('visitorForm').getAttribute('data-id');
+        const noteInput = document.getElementById('edit-notes');
+        if (!noteInput) {
+            showMessage('Note input field not found', 'error');
+            return;
+        }
+        const note = noteInput.value.trim();
+        if (!note) {
+            showMessage('Please enter a note', 'error');
+            return;
+        }
+        await saveVisitorNote(visitorId, note);
+    });
 });
