@@ -271,7 +271,7 @@ const validateField = (name, value, formData = {}) => {
     const requiredFields = [
         'firstname', 'lastname', 'gender', 'contactnumber', 'email',
         'date', 'time', 'nationalid', 'photo', 'visit', 'personname',
-        'department', 'durationtime', 'visitortype', 'drivernationalid'
+        'department', 'durationtime', 'visitortype'
     ];
     if (requiredFields.includes(name) && !value && name !== 'photo') {
         error = `${name.charAt(0).toUpperCase() + name.slice(1).replace(/([A-Z])/g, ' $1')} is required`;
@@ -306,6 +306,12 @@ const validateField = (name, value, formData = {}) => {
         case 'drivermobile':
             if (value && !/^\d+$/.test(value)) {
                 error = 'Phone number must contain only digits';
+            }
+            break;
+        case 'nationalid':
+        case 'drivernationalid':
+            if (value && !/^[a-zA-Z0-9]{4,}$/.test(value)) {
+                error = 'National ID must be at least 4 characters (letters and numbers allowed)';
             }
             break;
         case 'email':
