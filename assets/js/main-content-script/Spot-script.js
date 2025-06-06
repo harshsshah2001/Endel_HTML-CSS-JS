@@ -308,10 +308,13 @@ function previewImage(input, id) {
         const reader = new FileReader();
         reader.onload = e => {
             img.src = e.target.result;
+            img.style.display = 'block';
             img.classList.remove('hidden');
         };
         reader.readAsDataURL(file);
     } else if (img) {
+        img.src = '';
+        img.style.display = 'none';
         img.classList.add('hidden');
     }
 }
@@ -462,7 +465,7 @@ const validateField = (name, value, formData = {}) => {
 function populateForm(formId, visitor) {
     const form = document.getElementById(formId);
     if (!form) {
-        console.error(`Forum with ID '${formId}' not found`);
+        console.error(`Form with ID '${formId}' not found`);
         return;
     }
 
@@ -480,29 +483,39 @@ function populateForm(formId, visitor) {
         }
     });
 
-    const mainPreview = document.getElementById('mainPreview');
-    const photoInput = form.elements['photo'];
-    if (photoInput && visitor.photo !== undefined) {
-        const photoUrl = `https://192.168.3.73:3001/uploads/${encodeURIComponent(
-            visitor.photo
-        )}?t=${new Date().getTime()}`;
-        if (mainPreview) {
-            mainPreview.src = photoUrl;
-            mainPreview.classList.remove('hidden');
-        }
-        if (photoInput.dataset) photoInput.dataset.existingPhoto = visitor.photo;
-        console.log(`Populated photo with: ${visitor.photo}`);
-    } else if (mainPreview) {
-        mainPreview.src = '';
-        mainPreview.classList.add('hidden');
-        if (photoInput && photoInput.dataset)
-            delete photoInput.dataset.existingPhoto;
+const mainPreview = document.getElementById('mainPreview');
+const photoInput = form.elements['photo'];
+
+if (photoInput && visitor.photo !== undefined) {
+    const photoFilename = visitor.photo.split(/[\\/]/).pop(); // Extract just the filename
+    const photoUrl = `https://192.168.3.73:3001/uploads/${encodeURIComponent(photoFilename)}?t=${new Date().getTime()}`;
+
+    if (mainPreview) {
+        mainPreview.src = photoUrl;
+        mainPreview.classList.remove('hidden');
+        mainPreview.style.display = 'block';
     }
+
+    if (photoInput.dataset) {
+        photoInput.dataset.existingPhoto = photoFilename;
+    }
+
+    console.log(`Populated photo with: ${photoFilename}`);
+} else if (mainPreview) {
+    mainPreview.src = '';
+    mainPreview.classList.add('hidden');
+    mainPreview.style.display = 'none';
+
+    if (photoInput && photoInput.dataset) {
+        delete photoInput.dataset.existingPhoto;
+    }
+}
+
 
     const firstnameElement = form.elements['firstname'];
     if (!firstnameElement.value || firstnameElement.value.trim() === '') {
         console.warn(
-            'Firstname is empty after population. Visitor data may be incomplete:',
+            'First name is empty after population. Visitor data may be incomplete:',
             visitor
         );
         showError(
@@ -512,50 +525,32 @@ function populateForm(formId, visitor) {
     }
 }
 
-async function checkNationalId(nationalid, formId) {
-    console.log(`Checking National ID: "${nationalid}" for form ${formId}`);
-    const trimmedNationalId = nationalid.trim();
-    if (!trimmedNationalId) {
-        console.log('National ID is empty or only spaces, no action taken');
-        return;
-    }
-
-    if (trimmedNationalId.length < 4) {
-        console.log('National ID too short, waiting for more input');
-        showError('error-nationalid', 'National ID must be at least 4 characters');
+async function checkContactNumber(contactnumber, formId) {
+    if (!contactnumber || !/^\d+$/.test(contactnumber)) {
+        showError('error-contactnumber', 'Phone number must contain only digits');
         return;
     }
 
     try {
-        const response = await fetch(
-            `https://192.168.3.73:3001/visitors/nationalid/${encodeURIComponent(
-                trimmedNationalId
-            )}`,
-            {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            }
-        );
-        console.log(`Fetch response status: ${response.status}`);
-        if (response.ok) {
-            const visitor = await response.json();
-            console.log('Visitor data fetched:', visitor);
-            populateForm(formId, visitor);
-            showMessage('Visitor data loaded', 'success');
-        } else if (response.status === 404) {
-            console.log('No visitor found for national ID, allowing new entry');
+        const records = await apiRequest('master-records');
+        console.log('Fetched master records:', records);
+        const matchingRecord = Array.isArray(records) 
+            ? records.find(record => record.contactnumber === contactnumber)
+            : null;
+
+        if (matchingRecord) {
+            console.log('Found matching record for contactnumber:', matchingRecord);
+            populateForm(formId, matchingRecord);
+            showMessage('Appointment data loaded', 'success');
         } else {
-            throw new Error(`HTTP error! Status: ${response.status}`);
+            console.log('No record found for contactnumber:', contactnumber);
+            const contactInput = document.getElementById('contactnumber');
+            if (contactInput) contactInput.value = contactnumber;
+            showError('error-contactnumber', 'No record found for this contact number');
         }
     } catch (error) {
-        console.error('Error in checkNationalId:', error.message);
-        showMessage('Failed to check National ID', 'error');
-    } finally {
-        const form = document.getElementById(formId);
-        if (form) {
-            form.classList.remove('hidden');
-            form.style.display = 'block';
-        }
+        console.error('Error checking contactnumber:', error.message);
+        showError('error-contactnumber', 'Failed to check contact number: ' + error.message);
     }
 }
 
@@ -626,11 +621,12 @@ async function fetchPersonNameSuggestions(query) {
     }
 }
 
+
 const attachLiveValidation = () => {
     document.querySelectorAll('input, select, textarea').forEach(input => {
         input.addEventListener('input', () => {
-            const formData = {
-                date: document.getElementById('date')?.value,
+            const formData = new {
+                date: new document.getElementById('date')?.value,
                 time: document.getElementById('time')?.value,
             };
             const error = validateField(input.id, input.value, formData);
@@ -687,6 +683,19 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     } else {
         console.error('National ID input element not found');
+    }
+
+    const contactNumberInput = document.getElementById('contactnumber');
+    if (contactNumberInput) {
+        console.log('Attached contact number input listener');
+        contactNumberInput.addEventListener(
+            'input',
+            debounce(e => {
+                checkContactNumber(e.target.value, 'visitorForm');
+            }, 500)
+        );
+    } else {
+        console.error('Contact number input element not found');
     }
 
     const personnameInput = document.getElementById('personname');
@@ -775,9 +784,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const firstname = form.elements['firstname']?.value?.trim() || '';
         const email = form.elements['email']?.value?.trim() || '';
-        console.log(`Final Firstname value: "${firstname}"`);
-        if (firstname) formData.set('Firstname', firstname);
-        if (email) formData.set('email', email);
+        console.log(`Final Firstname value: ${firstname}`);
+        if (firstname) {
+            formData.set('Firstname', firstname);
+        }
+        if (email) {
+            formData.set('email', email);
+        }
 
         const photoInput = form.elements['photo'];
         const hasNewPhoto = photoInput?.files && photoInput.files.length > 0;
@@ -792,11 +805,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!firstname) {
-            showError('error-firstname', 'First name is required and cannot be empty');
+            showError('error-firstname', 'First name is required');
             valid = false;
         }
         if (!email) {
-            showError('error-email', 'Email is required and cannot be empty');
+            showError('error-email', 'Email is required');
             valid = false;
         }
 
@@ -884,10 +897,9 @@ document.addEventListener('DOMContentLoaded', () => {
             })
                 .then(response => {
                     if (!response.ok) {
-                        return response.json().catch(() => ({}))
-                            .then(errorData => {
-                                throw new Error(errorData.message || `HTTP ${response.status}`);
-                            });
+                        return response.json().then(errorData => {
+                            throw new Error(errorData.message || `HTTP ${response.status}`);
+                        });
                     }
                     return response.json();
                 })
