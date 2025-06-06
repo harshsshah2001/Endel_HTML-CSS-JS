@@ -547,8 +547,8 @@ $(document).ready(function () {
                 }
                 break;
             case 'userName':
-                if (value && !/^[a-zA-Z0-9]{4,}$/.test(value)) {
-                    error = 'Username must be at least 4 characters (letters and numbers allowed)';
+                if (value && !/^[a-zA-Z0-9]{2,}$/.test(value)) {
+                    error = 'Username must be at least 2 characters (letters and numbers allowed)';
                 }
                 break;
             case 'password':

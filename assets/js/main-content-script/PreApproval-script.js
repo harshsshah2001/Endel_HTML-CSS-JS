@@ -148,41 +148,40 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function checkContactNumber(contactnumber) {
-        if (!contactnumber || !/^\d+$/.test(contactnumber)) {
-            form.reset();
-            clearErrors();
-            errorMessage.classList.add('hidden');
-            return;
-        }
-
-        try {
-            const response = await fetch(`https://192.168.3.73:3001/master-records/by-contactnumber/${encodeURIComponent(contactnumber)}`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-
-            if (response.ok) {
-                const masterRecord = await response.json();
-                if (masterRecord) {
-                    console.log('Master record data fetched for contactnumber:', masterRecord);
-                    populateForm(masterRecord);
-                    showMessage('Master record data loaded', 'success');
-                } else {
-                    console.log('No master record found for contactnumber:', contactnumber);
-                    document.getElementById('contactnumber').value = contactnumber;
-                }
-            } else if (response.status === 404) {
-                console.log('No master record found for contactnumber:', contactnumber);
-                document.getElementById('contactnumber').value = contactnumber;
-            } else {
-                throw new Error(`HTTP ${response.status}`);
-            }
-        } catch (error) {
-            console.error('Error checking contactnumber:', error.message);
-            // showError('error-contactnumber', 'Failed to check mobile number');
-        }
+async function checkContactNumber(contactnumber) {
+    if (!contactnumber || !/^\d+$/.test(contactnumber)) {
+        form.reset();
+        clearErrors();
+        errorMessage.classList.add('hidden');
+        return;
     }
+
+    try {
+        const response = await fetch(`https://192.168.3.73:3001/master-records/by-contact?contactnumber=${encodeURIComponent(contactnumber)}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+            const masterRecord = await response.json();
+            if (masterRecord) {
+                console.log('Master record data fetched for contactnumber:', masterRecord);
+                populateForm(masterRecord);
+                showMessage('Master record data loaded', 'success');
+            } else {
+                console.log('No master record found for contactnumber:', contactnumber);
+                form.reset();
+                document.getElementById('contactnumber').value = contactnumber;
+                showMessage('No existing record found for this contact number', 'info');
+            }
+        } else {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+    } catch (error) {
+        console.error('Error checking contactnumber:', error.message);
+        showMessage(`Failed to fetch master record: ${error.message}`, 'error');
+    }
+}
 
     const attachLiveValidation = () => {
         document.querySelectorAll("input, select").forEach(input => {
