@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case 'email':
-                if (value && !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) {
+                if (value && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) {
                     error = 'Please enter a valid email address';
                 }
                 break;

@@ -571,18 +571,13 @@ $(document).ready(function () {
                 }
                 break;
             case 'emailId':
-                if (value && !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) {
+                if (value && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) {
                     error = 'Please enter a valid email address';
                 }
                 break;
             case 'employeeNo':
                 if (!value) {
                     error = 'Employee No is required';
-                }
-                break;
-            case 'address':
-                if (value && value.length < 5) {
-                    error = 'Address must be at least 5 characters';
                 }
                 break;
             case 'notes':
