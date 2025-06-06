@@ -7,7 +7,6 @@ function getPermissions() {
         canUpdate: false,
         canDelete: false
     };
-    // Check for specific module permissions (if they exist)
     const totalVisitorsPermissions = permissions.find(p => p.name === 'TotalVisitors') || dashboardPermissions;
     const approvedPermissions = permissions.find(p => p.name === 'ApprovedPasses') || dashboardPermissions;
     const disapprovedPermissions = permissions.find(p => p.name === 'DisapprovedPasses') || dashboardPermissions;
@@ -48,11 +47,12 @@ function getPermissions() {
 let approvedVisitors = [];
 let disapprovedVisitors = [];
 let exitVisitors = [];
+let passTypes = { spot: 0, preapproval: 0 };
 
 async function fetchApprovedVisitors() {
     try {
         console.log('Fetching approved visitors...');
-        const response = await fetch(`https://192.168.3.73:3001/visitors?t=${new Date().getTime()}`, {
+        const response = await fetch(`https://192.168.3.73:3001/master-records?t=${new Date().getTime()}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -83,7 +83,7 @@ async function fetchApprovedVisitors() {
 async function fetchDisapprovedVisitors() {
     try {
         console.log('Fetching disapproved visitors...');
-        const response = await fetch(`https://192.168.3.73:3001/visitors?t=${new Date().getTime()}`, {
+        const response = await fetch(`https://192.168.3.73:3001/master-records?t=${new Date().getTime()}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -114,7 +114,7 @@ async function fetchDisapprovedVisitors() {
 async function fetchExitVisitors() {
     try {
         console.log('Fetching exit visitors...');
-        const response = await fetch(`https://192.168.3.73:3001/visitors?t=${new Date().getTime()}`, {
+        const response = await fetch(`https://192.168.3.73:3001/master-records?t=${new Date().getTime()}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -139,6 +139,29 @@ async function fetchExitVisitors() {
         exitVisitors = JSON.parse(localStorage.getItem('exitVisitors') || '[]');
         exitVisitors = exitVisitors.filter(visitor => visitor.exit === true);
         updateExitCard();
+    }
+}
+
+async function fetchPassTypes() {
+    try {
+        console.log('Fetching pass types...');
+        const response = await fetch(`https://192.168.3.73:3001/master-records?t=${new Date().getTime()}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        passTypes = data.reduce((acc, record) => {
+            acc[record.recordType] = (acc[record.recordType] || 0) + 1;
+            return acc;
+        }, { spot: 0, preapproval: 0 });
+    } catch (error) {
+        console.error('Failed to fetch pass types:', error.message);
+        passTypes = { spot: 0, preapproval: 0 };
     }
 }
 
@@ -192,8 +215,8 @@ let visitors = [];
 
 async function fetchVisitors() {
     try {
-        console.log('Fetching all visitors from https://192.168.3.73:3001/visitors');
-        const response = await fetch(`https://192.168.3.73:3001/visitors?t=${new Date().getTime()}`, {
+        console.log('Fetching all visitors from https://192.168.3.73:3001/master-records');
+        const response = await fetch(`https://192.168.3.73:3001/master-records?t=${new Date().getTime()}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -258,55 +281,58 @@ document.addEventListener('alpine:init', () => {
         },
 
         async fetchUpcomingAppointments() {
-            try {
-                const response = await fetch('https://192.168.3.73:3001/appointment');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-
-                const data = await response.json();
-
-                const normalizeData = (item) => {
-                    let hostName = 'Unknown';
-                    let department = 'N/A';
-                    let designation = 'N/A';
-
-                    // Parse personname to extract host, department, and designation
-                    if (item.personname) {
-                        const match = item.personname.match(/^(.+?)\s*\((.+?)\s*&\s*(.+?)\)$/);
-                        if (match) {
-                            hostName = match[1].trim();
-                            department = match[2].trim();
-                            designation = match[3].trim();
-                        } else {
-                            hostName = item.personname;
-                        }
-                    }
-
-                    return {
-                        id: item.id,
-                        firstName: item.firstname || 'Unknown',
-                        lastName: item.lastname || 'Unknown',
-                        date: item.date || 'N/A',
-                        allocatedTime: item.time || 'N/A',
-                        host: hostName,
-                        department, // Add department
-                        designation, // Add designation
-                        purpose: item.visit || 'N/A',
-                        nationalId: item.nationalid || 'N/A'
-                    };
-                };
-
-                const processedData = Array.isArray(data) ? data : data.data || [];
-                const apiData = processedData.map(normalizeData);
-
-                this.appointmentsList = apiData;
-                console.log('Mapped Upcoming Appointments List:', JSON.stringify(this.appointmentsList, null, 2));
-            } catch (error) {
-                console.error('Error fetching upcoming appointments:', error);
-                this.showMessage('Failed to load upcoming appointments.', 'error');
-            }
+    try {
+        const response = await fetch('https://192.168.3.73:3001/master-records');
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
         }
+
+        const data = await response.json();
+
+        const normalizeData = (item) => {
+            let hostName = 'Unknown';
+            let department = 'N/A';
+            let designation = 'N/A';
+
+            if (item.personname) {
+                const match = item.personname.match(/^(.+?)\s*\((.+?)\s*&\s*(.+?)\)$/);
+                if (match) {
+                    hostName = match[1].trim();
+                    department = match[2].trim();
+                    designation = match[3].trim();
+                } else {
+                    hostName = item.personname;
+                }
+            }
+
+            return {
+                id: item.id,
+                firstName: item.firstname || 'Unknown',
+                lastName: item.lastname || 'Unknown',
+                date: item.date || 'N/A',
+                allocatedTime: item.time || 'N/A',
+                host: hostName,
+                department,
+                designation,
+                purpose: item.visit || 'N/A',
+                nationalId: item.nationalid || 'N/A',
+                typeOfPass: item.recordType || 'N/A'
+            };
+        };
+
+        const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+        const processedData = Array.isArray(data) ? data : data.data || [];
+        const apiData = processedData
+            .filter(item => item.date && item.date >= today)
+            .map(normalizeData);
+
+        this.appointmentsList = apiData;
+        console.log('Mapped Upcoming Appointments List:', JSON.stringify(this.appointmentsList, null, 2));
+    } catch (error) {
+        console.error('Error fetching upcoming appointments:', error);
+        this.showMessage('Failed to load upcoming appointments.', 'error');
+    }
+}
     }));
 
     // Today's Visitors
@@ -326,7 +352,7 @@ document.addEventListener('alpine:init', () => {
 
         async fetchTodaysVisitors() {
             try {
-                const response = await fetch('https://192.168.3.73:3001/visitors');
+                const response = await fetch('https://192.168.3.73:3001/master-records');
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
@@ -339,7 +365,6 @@ document.addEventListener('alpine:init', () => {
                     let department = 'N/A';
                     let designation = 'N/A';
 
-                    // Parse personname to extract host, department, and designation
                     if (item.personname) {
                         const match = item.personname.match(/^(.+?)\s*\((.+?)\s*&\s*(.+?)\)$/);
                         if (match) {
@@ -358,8 +383,8 @@ document.addEventListener('alpine:init', () => {
                         date: item.date || 'N/A',
                         allocatedTime: item.time || 'N/A',
                         host: hostName,
-                        department, // Add department
-                        designation, // Add designation
+                        department,
+                        designation,
                         purpose: item.visit || 'N/A',
                         nationalId: item.nationalid || 'N/A',
                         pendingApproval: item.isApproved ?? true
@@ -382,7 +407,7 @@ document.addEventListener('alpine:init', () => {
         async toggleApproval(id, currentStatus) {
             try {
                 const status = currentStatus ? 'disapprove' : 'approve';
-                const response = await fetch(`https://192.168.3.73:3001/appointment/${id}/status/${status}`, {
+                const response = await fetch(`https://192.168.3.73:3001/master-records/${id}/status/${status}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -436,86 +461,88 @@ document.addEventListener('alpine:init', () => {
         },
 
         async fetchVisitorDetails() {
-            try {
-                const response = await fetch('https://192.168.3.73:3001/visitors');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+    try {
+        const response = await fetch('https://192.168.3.73:3001/master-records');
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('API Response for Visitor Details:', JSON.stringify(data, null, 2));
+
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+        console.log('Today\'s date:', todayStr);
+
+        const normalizeData = (item) => {
+            let hostName = 'Unknown';
+            let department = 'N/A';
+            let designation = 'N/A';
+
+            if (item.personname) {
+                const match = item.personname.match(/^(.+?)\s*\((.+?)\s*&\s*(.+?)\)$/);
+                if (match) {
+                    hostName = match[1].trim();
+                    department = match[2].trim();
+                    designation = match[3].trim();
+                } else {
+                    hostName = item.personname;
                 }
-
-                const data = await response.json();
-                console.log('API Response for Visitor Details:', JSON.stringify(data, null, 2));
-
-                const today = new Date();
-                const todayStr = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
-                console.log('Today\'s date:', todayStr);
-
-                const normalizeData = (item) => {
-                    let hostName = 'Unknown';
-                    let department = 'N/A';
-                    let designation = 'N/A';
-
-                    if (item.personname) {
-                        const match = item.personname.match(/^(.+?)\s*\((.+?)\s*&\s*(.+?)\)$/);
-                        if (match) {
-                            hostName = match[1].trim();
-                            department = match[2].trim();
-                            designation = match[3].trim();
-                        } else {
-                            hostName = item.personname;
-                        }
-                    }
-
-                    let exitDateToUse = item.exitDate || localStorage.getItem(`exitDate_${item.id}`) || item.date;
-                    if (exitDateToUse?.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                        const [year, month, day] = exitDateToUse.split('-').map(Number);
-                        exitDateToUse = `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`;
-                    }
-
-                    if (!exitDateToUse?.match(/^\d{2}-\d{2}-\d{4}$/)) {
-                        console.warn(`Invalid exitDate format for visitor ID ${item.id}. Fallback used.`);
-                        exitDateToUse = todayStr;
-                    }
-
-                    return {
-                        id: item.id,
-                        firstName: item.firstname || 'Unknown',
-                        lastName: item.lastname || 'Unknown',
-                        date: item.date || 'N/A',
-                        allocatedTime: item.time || 'N/A',
-                        host: hostName,
-                        department,
-                        designation,
-                        purpose: item.visit || 'N/A',
-                        nationalId: item.nationalid || 'N/A',
-                        pendingApproval: true,
-                        inCampus: (item.isApproved ?? true) ? true : (item.inprogress ?? false),
-                        complete: item.complete ?? false,
-                        exitApproval: item.exit ?? false,
-                        exitDate: exitDateToUse,
-                        isApproved: item.isApproved ?? true
-                    };
-                };
-
-                const processedData = Array.isArray(data) ? data : data.data || [];
-                const apiData = processedData
-                    .map(normalizeData)
-                    .filter(item => {
-                        if (item.exitApproval && item.exitDate) {
-                            const [exitDay, exitMonth, exitYear] = item.exitDate.split('-').map(Number);
-                            const exitDate = new Date(Date.UTC(exitYear, exitMonth - 1, exitDay));
-                            const todayDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-                            return exitDate >= todayDate;
-                        }
-                        return true;
-                    });
-
-                this.visitorsList = apiData;
-                console.log('Mapped Visitor List:', JSON.stringify(this.visitorsList, null, 2));
-            } catch (error) {
-                console.error('Error fetching visitor details:', error);
-                this.showMessage('Failed to load visitor details.', 'error');
             }
-        },
+
+            let exitDateToUse = item.exitDate || localStorage.getItem(`exitDate_${item.id}`) || item.date;
+            if (exitDateToUse?.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [year, month, day] = exitDateToUse.split('-').map(Number);
+                exitDateToUse = `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`;
+            }
+
+            if (!exitDateToUse?.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                console.warn(`Invalid exitDate format for visitor ID ${item.id}. Fallback used.`);
+                exitDateToUse = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+            }
+
+            return {
+                id: item.id,
+                firstName: item.firstname || 'Unknown',
+                lastName: item.lastname || 'Unknown',
+                date: item.date || 'N/A',
+                allocatedTime: item.time || 'N/A',
+                host: hostName,
+                department,
+                designation,
+                purpose: item.visit || 'N/A',
+                nationalId: item.nationalid || 'N/A',
+                pendingApproval: true,
+                inCampus: (item.isApproved ?? true) ? true : (item.inprogress ?? false),
+                complete: item.complete ?? false,
+                exitApproval: item.exit ?? false,
+                exitDate: exitDateToUse,
+                isApproved: item.isApproved ?? true,
+                typeOfPass: item.recordType || 'N/A'
+            };
+        };
+
+        const processedData = Array.isArray(data) ? data : data.data || [];
+        const apiData = processedData
+            .filter(item => item.date && item.date === todayStr) // Filter for today only
+            .map(normalizeData)
+            .filter(item => {
+                if (item.exitApproval && item.exitDate) {
+                    const [exitDay, exitMonth, exitYear] = item.exitDate.split('-').map(Number);
+                    const exitDate = new Date(Date.UTC(exitYear, exitMonth - 1, exitDay));
+                    const todayDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+                    return exitDate >= todayDate;
+                }
+                return true;
+            });
+
+        this.visitorsList = apiData;
+        console.log('Mapped Visitor List:', JSON.stringify(this.visitorsList, null, 2));
+    } catch (error) {
+        console.error('Error fetching visitor details:', error);
+        this.showMessage('Failed to load visitor details.', 'error');
+    }
+},
 
         async updateVisitor(visitor) {
             try {
@@ -539,7 +566,7 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 if (status) {
-                    const response = await fetch(`https://192.168.3.73:3001/visitors/${visitor.id}/status/${status}`, {
+                    const response = await fetch(`https://192.168.3.73:3001/master-records/${visitor.id}/status/${status}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(body)
@@ -668,10 +695,8 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM fully loaded, initializing dashboard');
 
-    // Get permissions
     const permissions = getPermissions();
 
-    // Setup Create Visitor Gatepass button
     const createButton = document.getElementById('sticky-button');
     if (!createButton) {
         console.error('Create Visitor Gatepass button not found');
@@ -708,7 +733,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Setup dashboard cards permissions
     const cards = [
         {
             id: 'totalVisitorsCard',
@@ -743,7 +767,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Card is interactive only if canRead is true AND at least one of canCreate, canUpdate, or canDelete is true
         const isInteractive = card.permissions.canRead &&
             (card.permissions.canCreate || card.permissions.canUpdate || card.permissions.canDelete);
 
@@ -782,11 +805,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Initial fetch
     fetchApprovedVisitors();
     fetchDisapprovedVisitors();
     fetchExitVisitors();
     fetchVisitors();
+    fetchPassTypes();
 });
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -798,9 +821,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const borderColor = isDarkMode ? '#1f2937' : '#ffffff';
 
-    // Wait until visitor data is available
     setTimeout(() => {
-        // Visitors by Status Chart
         const ctxStatus = document.getElementById('chart-status').getContext('2d');
         new Chart(ctxStatus, {
             type: 'pie',
@@ -836,15 +857,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Types of Passes Chart
         const ctxType = document.getElementById('chart-type').getContext('2d');
         new Chart(ctxType, {
             type: 'pie',
             data: {
-                labels: ['SpotEntry', 'PreApprovalEntry'],
+                labels: ['Spot Entry', 'Pre-Approval Entry'],
                 datasets: [{
                     label: 'Pass Types',
-                    data: [40, 60], // Replace with dynamic values if needed
+                    data: [passTypes.spot, passTypes.preapproval],
                     backgroundColor: [backgroundColors[0], backgroundColors[1]],
                     borderColor: borderColor,
                     borderWidth: 1
@@ -866,8 +886,5 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
-    }, 500); // Adjust delay as needed based on when your visitors arrays are filled
+    }, 500);
 });
-
-
-

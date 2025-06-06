@@ -396,14 +396,18 @@ const validateField = (name, value, formData = {}) => {
             }
             break;
         case 'nationalid':
+            if (value && !/^[a-zA-Z0-9]{4,}$/.test(value)) {
+                error = 'National ID must be at least 4 characters (letters and numbers allowed)';
+            }
+            break;
         case 'drivernationalid':
             if (value && !/^[a-zA-Z0-9]{4,}$/.test(value)) {
                 error = 'National ID must be at least 4 characters (letters and numbers allowed)';
             }
             break;
         case 'email':
-            if (value && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) {
-                    error = 'Please enter a valid email address';
+            if (value && !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(value)) {
+                error = 'Please enter a valid email address';
             }
             break;
         case 'gender':

@@ -1,4 +1,4 @@
-// AllRecord.js
+
 
 let records = [];
 let currentPage = 1;
@@ -8,12 +8,8 @@ let searchQuery = '';
 // Original fetchAllRecords function (unchanged)
 async function fetchAllRecords() {
   try {
-    const response = await fetch('https://192.168.3.73:3001/master-records');
-
+    const response = await fetch('https://192.168.3.77:3001/master-records');
     const fetchedRecords = await response.json(); // Convert a json string to json object,array
-
-    const tableBody = document.getElementById('visitorTableBody');
-    // Do not update tableBody directly; return records for pagination
     return fetchedRecords;
   } catch (error) {
     console.error('Error fetching master records:', error);
@@ -117,36 +113,56 @@ function nextPage() {
   }
 }
 
-// Initialize page
+// Initialize page with permission check
 document.addEventListener('DOMContentLoaded', () => {
-  // Fetch and populate table
-  populateTable();
+  // Check permissions from local storage
+  const permissions = JSON.parse(localStorage.getItem('permissions')) || {};
+  if (permissions.name === 'All Records' && permissions.canRead === true) {
+    // Fetch and populate table
+    populateTable();
 
-  // Add event listeners for pagination buttons
-  document.getElementById('prevPage')?.addEventListener('click', previousPage);
-  document.getElementById('nextPage')?.addEventListener('click', nextPage);
+    // Add event listeners for pagination buttons
+    document.getElementById('prevPage')?.addEventListener('click', previousPage);
+    document.getElementById('nextPage')?.addEventListener('click', nextPage);
 
-  // Add event listener for entries per page dropdown
-  const entriesPerPageSelect = document.getElementById('entriesPerPage');
-  if (entriesPerPageSelect) {
-    entriesPerPageSelect.addEventListener('change', function () {
-      entriesPerPage = parseInt(this.value) || 10;
-      currentPage = 1;
-      populateTable();
-    });
+    // Add event listener for entries per page dropdown
+    const entriesPerPageSelect = document.getElementById('entriesPerPage');
+    if (entriesPerPageSelect) {
+      entriesPerPageSelect.addEventListener('change', function () {
+        entriesPerPage = parseInt(this.value) || 10;
+        currentPage = 1;
+        populateTable();
+      });
+    } else {
+      console.warn('Entries per page dropdown (#entriesPerPage) not found; assuming default 10 entries per page');
+    }
+
+    // Add event listener for search input
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        searchQuery = this.value;
+        currentPage = 1;
+        populateTable();
+      });
+    } else {
+      console.warn('Search input (#searchInput) not found; search functionality disabled');
+    }
   } else {
-    console.warn('Entries per page dropdown (#entriesPerPage) not found; assuming default 10 entries per page');
+    // Display access denied message
+    const tableBody = document.getElementById('visitorTableBody');
+    if (tableBody) {
+      tableBody.innerHTML = '<tr><td colspan="12">Access Denied: You do not have permission to view records.</td></tr>';
+    }
+    // Hide pagination controls
+    const paginationDiv = document.querySelector('.pagination');
+    if (paginationDiv) {
+      paginationDiv.style.display = 'none';
+    }
+    // Disable search and entries per page
+    const searchInput = document.getElementById('searchInput');
+    const entriesPerPageSelect = document.getElementById('entriesPerPage');
+    if (searchInput) searchInput.disabled = true;
+    if (entriesPerPageSelect) entriesPerPageSelect.disabled = true;
   }
-
-  // Add event listener for search input
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.addEventListener('input', function () {
-      searchQuery = this.value;
-      currentPage = 1;
-      populateTable();
-    });
-  } else {
-    console.warn('Search input (#searchInput) not found; search functionality disabled');
-  }
-});
+}); 
