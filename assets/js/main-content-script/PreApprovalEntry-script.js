@@ -1008,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const message1 = sessionStorage.getItem('successMessage');
         if (message1) {
-            showMessage(message, 'success');
+            showMessage(message1, 'success');
             sessionStorage.removeItem('successMessage'); // clear after showing
         }
 
@@ -1028,7 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const message2 = sessionStorage.getItem('successMessage');
         if (message2) {
-            showMessage(message, 'success');
+            showMessage(message2, 'success');
             sessionStorage.removeItem('successMessage');
         }
 
@@ -1047,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const message3 = sessionStorage.getItem('successMessage');
         if (message3) {
-            showMessage(message, 'success');
+            showMessage(message3, 'success');
             sessionStorage.removeItem('successMessage'); // Clear after showing
         }
 
