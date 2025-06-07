@@ -815,9 +815,9 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', function () {
     const isDarkMode = document.documentElement.classList.contains('dark');
 
-    const backgroundColors = isDarkMode
-        ? ['#f87171', '#facc15', '#4ade80', '#60a5fa', '#a78bfa']
-        : ['#ef4444', '#fbbf24', '#10b981', '#3b82f6', '#8b5cf6'];
+    // Define colors for chart-status (Total Visitors: blue, Approved Passes: green, Disapproved Passes: red, Total Exit Passes: yellow)
+    const statusBackgroundColors = ['#3b82f6', '#10b981', '#ef4444', '#fbbf24']; // Blue, Green, Red, Yellow
+    const typeBackgroundColors = ['#3b82f6', '#10b981']; // Blue for Spot Entry, Yellow for Pre-Approval Entry
 
     const borderColor = isDarkMode ? '#1f2937' : '#ffffff';
 
@@ -835,7 +835,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         disapprovedVisitors.length,
                         exitVisitors.length
                     ],
-                    backgroundColor: backgroundColors,
+                    backgroundColor: statusBackgroundColors,
                     borderColor: borderColor,
                     borderWidth: 1
                 }]
@@ -865,7 +865,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 datasets: [{
                     label: 'Pass Types',
                     data: [passTypes.spot, passTypes.preapproval],
-                    backgroundColor: [backgroundColors[0], backgroundColors[1]],
+                    backgroundColor: typeBackgroundColors,
                     borderColor: borderColor,
                     borderWidth: 1
                 }]
